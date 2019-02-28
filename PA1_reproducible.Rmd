@@ -1,0 +1,109 @@
+---
+title: "Reproducible Research: Peer Assessment 1"
+output: 
+  html_document:
+    keep_md: true
+---
+
+# Reproducible Data Assignment
+
+### Load in relevant packages
+
+```{r packages, echo = TRUE, results='hide'}
+library(dplyr)
+library(ggplot2)
+```
+
+Read in relevant data with:
+
+```{r reading, echo = TRUE}
+rawData <- read.csv("/home/rene/R/Coursera/Reproducible Research/activity.csv")
+rawData <- tbl_df(rawData) %>%
+        group_by(date)
+```
+
+### What is mean total number of steps taken per day?
+
+```{r assign1a, echo = TRUE}
+totalSteps <- summarise(rawData, total = sum(steps))
+
+ggplot(data=totalSteps, aes(totalSteps$total)) + 
+        geom_histogram(binwidth = 5000)
+```
+
+The table below describes the mean and median of the total steps taken.
+
+```{r assign1b, echo = TRUE}
+summary(totalSteps)
+```
+
+### What is the average daily activity pattern?
+
+```{r assign2a, echo = TRUE}
+timeData <- ungroup(rawData)
+timeData <- group_by(timeData, interval)
+timeDataMean <- summarise(timeData, average = mean(steps, na.rm = TRUE))
+
+ggplot(data=timeDataMean, aes(x=interval, y=average)) +
+        geom_line(color="red")+
+        geom_point()
+```
+
+The maximum peak of steps taken over the course of a day.
+
+```{r assign2b, echo = TRUE}
+# Provides the max value of 
+timeDataMean[which.max(timeDataMean$average),]
+```
+
+### Imputing missing values
+
+What is the number of missing values in the dataset I have to impute?
+
+```{r assign3a, echo = TRUE}
+# Calculate and report number of missing values in the dataset
+sum(is.na(rawData$steps))
+```
+
+Imputing missing values. As can be seen in the summary of the data, the imputed
+version does not hugely differ from the original one. Imputing does not to have
+a significant effect on the mean and median of the data.
+
+```{r assign3b, echo = TRUE}
+filledData <- mutate(rawData, 
+                     stepsFilled = ifelse(is.na(steps), 
+                                          timeDataMean$average[which(timeDataMean$interval == interval)], 
+                                          steps))
+
+totalFilledData <- summarise(filledData, total = sum(stepsFilled))
+
+# The plot and the summary shows that imputing the data does not have a huge
+# effect on the result (e.g. mean & median)
+ggplot(data=totalFilledData, aes(totalFilledData$total)) + 
+        geom_histogram(binwidth = 5000)
+
+summary(totalFilledData)
+```
+
+### Are there differences in activity patterns between weekdays and weekends?
+
+The average amount of steps taken during the day tends to peak less during the 
+weekend and becomes more normal distributed.
+
+```{r assign4, echo = TRUE}
+filledData$date <- as.Date(filledData$date)
+
+filledData <- mutate(filledData, dayType = weekdays(date)) %>%
+        mutate(dayType = ifelse(dayType != "Samstag" & dayType != "Sonntag",
+                                "weekday", "weekend")) %>%
+        ungroup() %>%
+        group_by(interval, dayType)
+
+filledDataSum <- summarise(filledData, average = mean(stepsFilled))
+
+p <- ggplot(data = filledDataSum, aes(x = interval, y = average)) + 
+        geom_line(color="red")+
+        geom_point()
+
+p + facet_grid(dayType ~ .)
+```
